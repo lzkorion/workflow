@@ -116,6 +116,39 @@ input,select,textarea{font-size:16px;min-height:46px}
 .two-way-note{margin:0 0 11px;color:var(--muted);font-size:12px}
 .grade:disabled{opacity:.32;cursor:not-allowed}
 @media(max-width:700px){.spell-toggle{max-width:100%;font-size:12px}.session-header{gap:12px}.extra-learning .flex{flex-wrap:nowrap}.extra-learning .secondary{font-size:12px;padding:9px 12px}}
+
+/* FSRS-6: Home is the plan, not a dashboard. No charts, streaks, rewards. */
+.today-summary{font-size:13px;color:var(--muted);margin:-11px 0 18px}
+.today-summary strong{color:var(--text);font-weight:650}
+.today-plans{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;align-items:start}
+.today-plan{padding:25px 23px 21px;display:flex;flex-direction:column;gap:0}
+.today-plan.due-plan{border-color:#3b5862}
+.plan-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:7px}
+.plan-heading h2{margin:0;font-size:21px}
+.plan-heading .eyebrow{margin-bottom:7px}
+.plan-number{font-size:37px;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--accent2);font-weight:680}
+.plan-number span{font-size:12px;font-weight:500;color:var(--muted);margin-left:3px}
+.plan-desc{font-size:13px;color:var(--muted);line-height:1.6;margin:9px 0 14px;min-height:40px}
+.today-word-list{padding:0;margin:0 0 16px;list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.today-word-list li{border:1px solid var(--border);background:var(--raised);padding:9px 11px;border-radius:9px;font-size:14px;font-weight:550;word-break:break-word;min-width:0}
+.plan-empty{font-size:14px;color:var(--soft);min-height:85px;margin:8px 0}
+.more-words{margin:-4px 0 16px}
+.more-words summary{color:var(--accent);font-size:13px;cursor:pointer;list-style:disclosure-closed}
+.more-words[open] summary{margin-bottom:12px}
+.more-words .today-word-list{margin-bottom:0}
+.plan-overflow,.plan-note{color:var(--muted);font-size:12px;line-height:1.55}
+.today-action{width:100%;min-height:48px;margin-top:auto}
+.more-new-inline{border-top:1px solid var(--border);padding-top:15px;margin-top:17px}
+.more-new-inline label{display:block;color:var(--muted);font-size:12px;margin-bottom:8px}
+.more-new-inline .flex{gap:8px}
+.more-new-inline input{max-width:85px;min-width:0}
+.more-new-inline .flex button{flex:1}
+.plan-note{margin-top:15px}
+.active-study{display:flex;align-items:center;justify-content:space-between;gap:15px;border:1px solid #3c6975;background:#15303b;padding:14px 17px;border-radius:14px;margin-bottom:16px}
+.active-study span{color:var(--accent2);font-weight:600;font-size:13px}
+@media(max-width:940px){.today-plans{grid-template-columns:1fr}}
+@media(max-width:700px){.today-plan{padding:22px 16px 18px}.plan-number{font-size:32px}.today-word-list{gap:7px}.today-word-list li{font-size:13px;padding:9px 10px}.plan-desc{min-height:0}.today-summary{font-size:12px;margin-bottom:13px}.active-study{flex-direction:column;align-items:stretch}.today-plans{gap:12px}}
+
 </style>
 </head>
 <body>
@@ -164,31 +197,114 @@ const routes=[['home','⌂','今日概览'],['practice','◈','双向回忆'],['
 const mobileLabels={home:'今日',practice:'学习',library:'词库',settings:'设置'};
 function nav(){const renderNav=mobile=>routes.map(([id,icon,name])=>`<button class="${mobile?'':'navbtn '}${view===id?'active':''}" data-nav="${id}"><span class="${mobile?'':'navicon'}">${icon}</span>${mobile?mobileLabels[id]:name}</button>`).join('');document.getElementById('desktopNav').innerHTML=renderNav(false);document.getElementById('mobileNav').innerHTML=renderNav(true)}
 function head(k,t,desc){return `<div class="topline"><div><div class="eyebrow">${k}</div><h1>${t}</h1><p class="subhead">${desc}</p></div><div class="date-pill">${new Date().toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'long'})}</div></div>`}
-function estimateInterval(w,grade){const n=w.repetitions||0,i=w.interval||0,e=w.ease||2.5;if(grade===0)return '10 分钟后';if(grade===1)return (n===0?1:Math.max(1,Math.round(i*.65)))+' 天后';if(grade===2)return (n===0?1:n===1?3:Math.max(i+1,Math.round(i*e)))+' 天后';return (n===0?3:n===1?5:Math.max(i+2,Math.round(i*e*1.25)))+' 天后'}
-function schedule(w,grade){const n=w.repetitions||0,i=w.interval||0,e=w.ease||2.5;let interval=0;
- if(grade===0){w.repetitions=0;w.interval=0;w.ease=Math.max(1.3,e-.20);w.lapses=(w.lapses||0)+1;w.due=Date.now()+10*60000}
- else if(grade===1){interval=n===0?1:Math.max(1,Math.round(i*.65));w.repetitions=Math.max(1,n);w.interval=interval;w.ease=Math.max(1.3,e-.15);w.due=addDays(interval)}
- else if(grade===2){interval=n===0?1:n===1?3:Math.max(i+1,Math.round(i*e));w.repetitions=n+1;w.interval=interval;w.due=addDays(interval)}
- else {interval=n===0?3:n===1?5:Math.max(i+2,Math.round(i*e*1.25));w.repetitions=n+1;w.interval=interval;w.ease=Math.min(3.0,e+.08);w.due=addDays(interval)}
- w.lastReviewed=Date.now();w.lastGrade=grade;return w.due}
+// FSRS-6 standard 21-parameter DSR model, default weights from open-spaced-repetition.
+// One two-direction practice cycle counts as ONE FSRS review; grade=min(two directions).
+// The desired retention is fixed at 90%; past SM-2 history cannot be reconstructed exactly.
+const FSRS6_W=[0.212,1.2931,2.3065,8.2956,6.4133,0.8334,3.0194,0.001,1.8722,0.1666,0.796,1.4835,0.0614,0.2629,1.6483,0.6014,1.8729,0.5425,0.0912,0.0658,0.1542];
+const FSRS6_RETENTION=0.90;
+const fsrsClamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const fsrsD0=g=>fsrsClamp(FSRS6_W[4]-Math.exp(FSRS6_W[5]*(g-1))+1,1,10);
+function fsrsRetention(elapsed,s){
+ const decay=FSRS6_W[20],factor=Math.pow(.9,-1/decay)-1;
+ return Math.pow(1+factor*Math.max(0,elapsed)/Math.max(.01,s),-decay);
+}
+function fsrsInterval(s){
+ const decay=FSRS6_W[20],factor=Math.pow(.9,-1/decay)-1;
+ return fsrsClamp(Math.round(Math.max(.01,s)*(Math.pow(FSRS6_RETENTION,-1/decay)-1)/factor),1,36500);
+}
+function fsrsNextState(state,g,elapsedDays){
+ const p=FSRS6_W;
+ if(!state||!(state.stability>0))return {stability:p[g-1],difficulty:fsrsD0(g),version:6};
+ const S=fsrsClamp(Number(state.stability),.01,36500),D=fsrsClamp(Number(state.difficulty)||fsrsD0(3),1,10);
+ const R=fsrsRetention(elapsedDays,S);
+ let newS;
+ if(elapsedDays<1){
+   let multiplier=Math.exp(p[17]*(g-3+p[18]))*Math.pow(S,-p[19]);
+   if(g>=2)multiplier=Math.max(1,multiplier);
+   newS=S*multiplier;
+ }else if(g===1){
+   newS=p[11]*Math.pow(D,-p[12])*(Math.pow(S+1,p[13])-1)*Math.exp(p[14]*(1-R));
+   newS=Math.min(newS,S/Math.exp(p[17]*p[18]));
+ }else{
+   const bonus=g===2?p[15]:g===4?p[16]:1;
+   newS=S*(1+Math.exp(p[8])*(11-D)*Math.pow(S,-p[9])*(Math.exp(p[10]*(1-R))-1)*bonus);
+ }
+ const delta=-p[6]*(g-3)*(10-D)/9;
+ const nextD=fsrsClamp(p[7]*fsrsD0(4)+(1-p[7])*(D+delta),1,10);
+ return {stability:fsrsClamp(newS,.01,36500),difficulty:nextD,version:6};
+}
+function migrateFsrsWord(w){
+ if(!w||!(Number(w.seen)>0)||w.fsrs?.version===6&&w.fsrs.stability>0)return w;
+ const grade=(Number.isInteger(w.lastGrade)?fsrsClamp(w.lastGrade+1,1,4):3);
+ // Preserve existing due date as-is; approximate state only when the word is next reviewed.
+ w.fsrs={stability:fsrsClamp(Number(w.interval)||FSRS6_W[grade-1],.01,36500),difficulty:fsrsD0(grade),version:6,estimatedFromLegacy:true};
+ return w;
+}
+function nextCalendarDay(n){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+n);return d.getTime()}
+function simulateFsrsReview(word,grade,now=Date.now()){
+ const p=JSON.parse(JSON.stringify(word)); // Preview does not mutate stored progress.
+ migrateFsrsWord(p);
+ const g=grade+1;
+ const elapsed=p.seen?Math.max(0,(now-(Number(p.lastReviewed)||now))/86400000):0;
+ const next=fsrsNextState(p.seen?p.fsrs:null,g,elapsed);
+ const nextDays=fsrsInterval(next.stability);
+ const isForgot=grade===0;
+ return {state:next,days:nextDays,due:isForgot?now+10*60000:nextCalendarDay(nextDays)};
+}
+
+function estimateInterval(w,grade){
+ const v=simulateFsrsReview(w,grade);
+ return grade===0?'10 分钟后':v.days+' 天后';
+}
+function schedule(w,grade){
+ const now=Date.now();
+ const update=simulateFsrsReview(w,grade,now);
+ w.fsrs=update.state;
+ w.due=update.due;
+ w.interval=grade===0?0:update.days;
+ w.repetitions=grade===0?0:(Number(w.repetitions)||0)+1;
+ if(grade===0)w.lapses=(Number(w.lapses)||0)+1;
+ w.lastReviewed=now;
+ w.lastGrade=grade;
+ return w.due;
+}
 function nextCard(){let id=session.shift();if(!id&&cycleStage===0&&phaseOrder.length){cycleStage=1;phaseDone=0;session=phaseOrder.slice();id=session.shift()}current=id?db.words.find(w=>w.id===id)||null:null;revealed=false;typedCorrect=null;}
 function begin(type='mix',howMany=30){if(current){view='practice';render();return}const due=dueWords(),n=newWords(),cap=Math.min(500,Math.max(1,Number(howMany)||30));
  const planned=type==='review'?due.slice(0,60):type==='new'?n.slice(0,cap):[...due.slice(0,60),...n.slice(0,Math.max(0,db.target-today().new))];
  phaseOrder=planned.map(w=>w.id);session=phaseOrder.slice();phaseGrades={};cycleStage=0;phaseDone=0;sessionTotal=session.length;sessionDone=0;sessionKind=type;if(session.length)nextCard();else current=null;save();view='practice';render();if(!current)toast('当前没有符合条件的单词')}
 function rateWord(grade){if(!current||!revealed||grade<0||grade>3)return;if(typedCorrect===false&&cycleStage===1&&grade>0){toast('拼写不正确，这轮需要选“忘记”');return}
  if(cycleStage===0){phaseGrades[current.id]=grade;phaseDone++;nextCard();save();render();if(cycleStage===1&&phaseDone===0)toast('英文→中文已完成，开始中文→英文的第二遍检查');return}
- const overall=Math.min(phaseGrades[current.id]??grade,grade);const w=current;const first=w.seen===0;const t=today();t.total=(t.total||0)+1;if(first)t.new=(t.new||0)+1;else t.reviews=(t.reviews||0)+1;if(overall>=2){t.correct=(t.correct||0)+1;w.correct=(w.correct||0)+1}else w.wrong=(w.wrong||0)+1;w.seen=(w.seen||0)+1;
- schedule(w,overall);sessionDone++;phaseDone++;nextCard();save();render();if(overall===0)toast(`已安排约 10 分钟后重练：${w.en}`)}
-function renderHome(){const s=stats(),progress=Math.min(100,Math.round(s.newToday/Math.max(1,db.target)*100));let bars=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const n=db.today[dayKey(d)]?.total||0;bars.push({name:i===0?'今天':d.toLocaleDateString('zh-CN',{weekday:'short'}),n})}const max=Math.max(5,...bars.map(x=>x.n));
- return `${head('SPACED REPETITION','只复习该复习的词。','主动回忆 + 按表现调整间隔。每个单词双向各测一次，较弱的一次决定下次复习时间。')}
- <div class="stats"><div class="stat"><div class="label">今日到期</div><div class="num">${s.due}<span class="unit">词</span></div><div class="mini">只测到期词，最多每轮 60 个</div></div><div class="stat"><div class="label">今日新学</div><div class="num">${s.newToday}<span class="unit">/ 建议 ${db.target}</span></div><div class="mini">达到目标后仍可继续学</div></div><div class="stat"><div class="label">累计学过</div><div class="num">${s.learned}<span class="unit">/ ${s.total}</span></div><div class="mini">新词剩余 ${s.available} 个</div></div><div class="stat"><div class="label">今日完成</div><div class="num">${s.answered}<span class="unit">词次</span></div><div class="mini">双向两次回忆算一次</div></div></div>
- <div class="section-grid"><section class="panel accent-panel"><div class="eyebrow">TODAY'S PLAN</div><h2>按到期日复习</h2><p class="subhead">${s.due?s.due+' 个词今天需要复习；其他以前背过的词无需重复刷。':'目前没有到期的旧词。'} 今天还可学习新词 ${s.available} 个。</p>
- <div class="target-line"><span>新词建议进度（非上限）</span><strong>${s.newToday} / ${db.target}</strong></div><div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
- <div class="flex" style="margin-top:23px;gap:9px"><button class="primary" data-action="review" ${!s.due?'disabled':''}>复习到期 ${s.due} 词</button><button class="secondary" data-action="new" ${!s.available?'disabled':''}>学 ${Math.min(db.target,s.available)} 个新词</button>${current?`<button class="secondary" data-nav="practice">继续本轮 (${session.length+1})</button>`:''}</div>
- <div class="extra-learning"><label for="extraCount">想多学就加新词，不受每日目标限制</label><div class="flex"><input id="extraCount" class="small-input" inputmode="numeric" type="number" min="1" max="500" value="30" aria-label="本轮额外新词数量"/><button class="secondary" data-action="more-new" ${!s.available?'disabled':''}>按指定数量继续学 →</button></div></div>
- ${s.missing?`<p class="notice-missing">另有 ${s.missing} 个词缺少中文释义，暂不进入双向复习。请导入中英词性词表补齐。</p>`:''}
- </section><section class="panel"><div class="panel-head"><h2>近 7 天双向复习</h2><span class="hint">每个词的两次测试合计为 1 次</span></div><div class="bars">${bars.map((b,i)=>`<div class="bar-col"><div title="${b.n} 词次" class="bar ${i===6?'today':''}" style="height:${Math.max(3,Math.round(b.n/max*93))}px"></div><span>${b.name}</span></div>`).join('')}</div></section></div>
- <section class="panel" style="margin-top:15px"><h2>复习为什么不用从头刷？</h2><div class="feature-line"><div class="feature-icon">01</div><div><strong>每个词按到期日进入队列</strong><p>今天只出现应当复习的旧词。记住的词逐步推迟到数天、数周以后。</p></div></div><div class="feature-line"><div class="feature-icon">02</div><div><strong>英→中与中→英共同决定一次成绩</strong><p>一轮两次检索，只记较弱的成绩，避免只会认读却不会回忆英文。</p></div></div><div class="feature-line"><div class="feature-icon">03</div><div><strong>遗忘后短间隔再练</strong><p>忘记的词约 10 分钟后再次到期，困难的词则安排更近的复习。</p></div></div></section>`}
+ const overall=Math.min(phaseGrades[current.id]??grade,grade);const w=current;const first=w.seen===0;const t=today();t.total=(t.total||0)+1;if(first)t.new=(t.new||0)+1;else t.reviews=(t.reviews||0)+1;if(overall>=2){t.correct=(t.correct||0)+1;w.correct=(w.correct||0)+1}else w.wrong=(w.wrong||0)+1;schedule(w,overall);w.seen=(w.seen||0)+1;sessionDone++;phaseDone++;nextCard();save();render();if(overall===0)toast(`已安排约 10 分钟后重练：${w.en}`)}
+function homeWordPreview(words,limit=12){
+ if(!words.length)return '<p class="plan-empty">当前没有需要处理的单词。</p>';
+ const primary=words.slice(0,limit).map(w=>`<li>${escapeHTML(w.en)}</li>`).join('');
+ const hidden=words.slice(limit).map(w=>`<li>${escapeHTML(w.en)}</li>`).join('');
+ return `<ul class="today-word-list">${primary}</ul>${hidden?`<details class="more-words"><summary>展开其余 ${words.length-limit} 词</summary><ul class="today-word-list">${hidden}</ul></details>`:''}`;
+}
+function renderHome(){
+ const s=stats(),reviews=dueWords(),dueBatch=reviews.slice(0,60),nextBatch=newWords().slice(0,Math.max(1,Number(db.target)||30));
+ const active=current?`<section class="active-study"><span>上次的双向练习还没结束</span><button class="primary" data-nav="practice">继续本轮 →</button></section>`:'';
+ return `${head('TODAY · FSRS-6','今天学什么','先处理到期复习，再学习下一批新词。其他单词不需要反复刷。')}
+ ${active}
+ <div class="today-summary">今日已复习 <strong>${s.reviewedToday}</strong> 词 · 今日新学 <strong>${s.newToday}</strong> 词 · 每日建议 <strong>${db.target}</strong> 词（不限量）</div>
+ <div class="today-plans">
+   <section class="panel today-plan due-plan" aria-label="今天需要复习的单词">
+     <div class="plan-heading"><div><div class="eyebrow">01 · 到期旧词</div><h2>今天复习什么</h2></div><strong class="plan-number">${s.due}<span>词</span></strong></div>
+     <p class="plan-desc">只显示到期的词。这里不显示中文释义，以免提前看到答案。</p>
+     ${homeWordPreview(dueBatch)}
+     ${reviews.length>60?`<p class="plan-overflow">当前先复习 60 个；剩余 ${reviews.length-60} 个会保留在到期队列，下轮继续。</p>`:''}
+     <button class="primary today-action" data-action="review" ${!s.due||current?'disabled':''}>${s.due?`开始复习 ${dueBatch.length} 词`:'今日暂时没有到期词'}</button>
+   </section>
+   <section class="panel today-plan next-plan" aria-label="接下来要学的新单词">
+     <div class="plan-heading"><div><div class="eyebrow">02 · 下一批新词</div><h2>今天接着学什么</h2></div><strong class="plan-number">${nextBatch.length}<span>词</span></strong></div>
+     <p class="plan-desc">按照词库原有顺序，下面就是下一批要学的词。</p>
+     ${homeWordPreview(nextBatch)}
+     <button class="secondary today-action" data-action="new" ${!s.available||current?'disabled':''}>${s.available?`学习这 ${nextBatch.length} 个新词`:'词库中已无可学新词'}</button>
+     <div class="more-new-inline"><label for="extraCount">多学一些（每次最多 500 词）</label><div class="flex"><input type="number" min="1" max="500" id="extraCount" class="small-input" value="30" inputmode="numeric"/><button class="secondary" data-action="more-new" ${!s.available||current?'disabled':''}>按数量继续学</button></div></div>
+   </section>
+ </div>
+ ${s.missing?`<p class="plan-note">词库中另有 ${s.missing} 个词缺少中文释义，暂时不能参加双向回忆。可在「词库」中导入完整释义。</p>`:''}`;
+}
 function renderPractice(){const s=stats();const shell=`<div class="practice-page"><div class="practice-title"><div><div class="eyebrow">TWO-WAY RETRIEVAL</div><h1>双向回忆</h1></div><span class="mini-progress">第 ${cycleStage+1} 遍 · ${phaseDone}/${Math.max(sessionTotal,0)} 词</span></div>
  <div class="session-header"><div class="seg"><button class="selected" disabled>英→中，再中→英</button></div><label class="spell-toggle"><input type="checkbox" id="typeAnswer" ${db.typeAnswer?'checked':''}/> 中文→英文时用键盘拼写</label></div>`;
  if(!current)return shell+`<div class="panel" style="text-align:center;padding:47px 18px"><div class="eyebrow">${sessionDone?'COMPLETE':'READY'}</div><h2>${sessionDone?'本轮完成':'开始学习'}</h2><p class="hint">${sessionDone?`已完成 ${sessionDone} 个单词的双向回忆。仅在下次到期时再复习，今天不需要把全部旧词刷一遍。`:`当前有 ${s.due} 个到期词、${s.available} 个可学新词。`}</p><div class="button-row" style="justify-content:center"><button class="primary" data-action="review" ${!s.due?'disabled':''}>复习到期词</button><button class="secondary" data-action="new" ${!s.available?'disabled':''}>学习 ${Math.min(db.target,s.available)} 个新词</button></div></div></div>`;
@@ -205,7 +321,7 @@ function renderLibrary(){const subset=db.words.filter(w=>(w.en+' '+w.cn).toLower
  <div class="search-row"><input id="searchBox" aria-label="搜索单词" placeholder="搜索英文或中文释义…" value="${escapeHTML(search)}"><button class="primary" data-action="add-word">＋ 添加单词</button><button class="secondary" data-action="import-dialog">批量导入</button></div><div class="flex" style="justify-content:space-between;margin-bottom:12px"><span class="hint">显示 ${visible.length} / ${subset.length} 词（共 ${db.words.length}）</span><button class="ghost" data-action="export-csv">导出 CSV</button></div><div class="wordlist">${subset.length?visible.map(w=>`<div class="wordrow"><div><strong>${escapeHTML(w.en)}</strong><div class="sm">${!hasMeaning(w)?'待补中文':!w.seen?'尚未学过':w.due<=Date.now()?'到期复习':`下次 ${new Date(w.due).toLocaleDateString('zh-CN')}`}</div></div><div class="meaningcell">${escapeHTML(w.cn)}</div><div class="actioncell flex"><button class="mini-btn" data-edit="${key(w.id)}">编辑</button><button class="mini-btn" data-delete="${key(w.id)}" title="删除单词">×</button></div></div>`).join(''):`<div class="empty">没有匹配的单词</div>`}</div>${visible.length<subset.length?`<div class="button-row"><button class="secondary" data-action="more-words">继续显示 100 词（剩 ${subset.length-visible.length}）</button></div>`:''}`}
 function renderSettings(){const s=stats();return `${head('PERSONALIZE','设置与备份','学习记录只保存在当前设备。切换网站地址不会自动迁移历史，请先备份。')}
  <div class="panel"><h2>学习计划</h2><div class="settings-row"><div><strong>每日新词建议值</strong><div class="quiet">用于首页快捷按钮和进度参考，不再限制当天学习数量</div></div><select id="targetSelect" class="small-input">${[5,10,15,20,30,40,50,80,100].map(n=>`<option value="${n}" ${n===db.target?'selected':''}>${n} 词</option>`).join('')}</select></div><div class="settings-row"><div><strong>词库情况</strong><div class="quiet">${s.total} 词；已有学习记录 ${s.learned}；缺中文 ${s.missing}</div></div><button class="secondary" data-nav="library">管理词库</button></div></div>
- <div class="panel" style="margin-top:15px"><h2>间隔复习规则</h2><p class="hint">采用受 SM-2 启发的简化间隔重复算法，而非精确预测个人遗忘时间。整批单词先英→中、再中→英；每词两次以较差结果安排下一次。忘记约 10 分钟再练；记得通常从 1 天、3 天开始，再按表现逐步延长；困难会缩短间隔。</p><p class="hint">到期队列每轮最多 60 个，超过的词留在待复习列表，下轮继续。数据会保留旧版学习记录和到期时间。</p></div>
+ <div class="panel" style="margin-top:15px"><h2>间隔复习规则</h2><p class="hint">使用 FSRS-6 记忆模型（默认 21 参数，目标保持率 90%）。整批先英→中、再中→英，取两次中较低的成绩，给每个单词计算下次到期日期。忘记的词约 10 分钟后可重练。默认参数尚未根据你的个人记录训练，不保证每天实际保持率正好为 90%。</p><p class="hint">到期队列每轮最多 60 个，剩余单词留待下一轮。旧版的复习次数和原定到期日会保留；因旧版不记录完整回忆历史，其 FSRS 初始状态只能近似估计。</p></div>
  <div class="panel" style="margin-top:15px"><h2>完整备份</h2><p class="hint">JSON 包含词库、学习次数、到期安排和正在进行的练习。更换网站或设备前一定要保存备份。</p><div class="flex"><button class="primary" data-action="export-json">下载 JSON 备份</button><button class="secondary" data-action="share-backup">分享到“文件”</button><button class="secondary" data-action="import-json">恢复备份</button><button class="secondary" data-action="import-dialog">导入词库 TXT / CSV</button></div><input id="jsonFile" type="file" accept=".json,application/json" hidden/><div class="footer-note">建议在 iPhone / iPad 上用 Safari 访问 GitHub Pages 并添加到主屏幕。不同设备不自动同步。清理网站数据会删除本机学习记录。</div></div>
  <div class="panel" style="margin-top:15px"><h2>重置</h2><button class="danger" data-action="reset-progress">只清空学习记录</button></div>`}
 function render(){nav();document.getElementById('content').innerHTML=view==='home'?renderHome():view==='practice'?renderPractice():view==='library'?renderLibrary():renderSettings();if(view==='practice'&&db.typeAnswer&&cycleStage===1&&current&&!revealed&&window.innerWidth>700)document.getElementById('spellInput')?.focus()}
@@ -222,7 +338,7 @@ function exportJSON(){save();download(`词序-完整备份-${dayKey()}.json`,JSO
 async function shareBackup(){save();const filename=`词序-完整备份-${dayKey()}.json`,file=new File([JSON.stringify(db,null,2)],filename,{type:'application/json'});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:'词序完整备份'});return}catch(e){if(e.name==='AbortError')return}}download(filename,JSON.stringify(db,null,2),'application/json')}
 function speak(){if(!current||!('speechSynthesis' in window))return toast('浏览器暂不支持朗读');speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(current.en);u.lang='en-US';u.rate=.83;speechSynthesis.speak(u)}
 function checkSpell(){if(!current||cycleStage!==1||!db.typeAnswer)return;const v=(document.getElementById('spellInput')?.value||'').trim().replace(/\s+/g,' ').toLowerCase();if(!v)return toast('请输入英文');typedCorrect=v===current.en.trim().replace(/\s+/g,' ').toLowerCase();revealed=true;save();render()}
-function resetProgress(){if(!confirm('仅清空全部单词的记忆安排和学习记录，保留词库。确定吗？'))return;for(const w of db.words)Object.assign(w,{seen:0,correct:0,wrong:0,repetitions:0,interval:0,ease:2.5,due:0,lapses:0});db.today={};session=[];current=null;sessionDone=0;sessionTotal=0;phaseOrder=[];phaseGrades={};phaseDone=0;cycleStage=0;save();render();toast('已清空学习记录')}
+function resetProgress(){if(!confirm('仅清空全部单词的记忆安排和学习记录，保留词库。确定吗？'))return;for(const w of db.words)Object.assign(w,{seen:0,correct:0,wrong:0,repetitions:0,interval:0,ease:2.5,due:0,lapses:0,fsrs:null,lastReviewed:0,lastGrade:null});db.today={};session=[];current=null;sessionDone=0;sessionTotal=0;phaseOrder=[];phaseGrades={};phaseDone=0;cycleStage=0;save();render();toast('已清空学习记录')}
 document.body.addEventListener('click',e=>{const el=e.target.closest('[data-nav],[data-action],[data-grade],[data-edit],[data-delete]');if(!el)return;if(el.dataset.nav){view=el.dataset.nav;render();return}if(el.dataset.grade!==undefined){rateWord(Number(el.dataset.grade));return}if(el.dataset.edit){openWordModal(el.dataset.edit);return}if(el.dataset.delete){const w=db.words.find(w=>w.id===el.dataset.delete);if(w&&confirm(`删除“${w.en}”及其所有学习记录吗？`)){db.words=db.words.filter(x=>x.id!==w.id);session=session.filter(x=>x!==w.id);phaseOrder=phaseOrder.filter(x=>x!==w.id);delete phaseGrades[w.id];if(current?.id===w.id)nextCard();save();render()}return}switch(el.dataset.action){case 'review':begin('review');break;case 'new':begin('new',db.target);break;case 'more-new':begin('new',document.getElementById('extraCount')?.value||30);break;case 'reveal':revealed=true;save();render();break;case 'speak':speak();break;case 'check-spell':checkSpell();break;case 'more-words':libraryLimit+=100;render();break;case 'add-word':openWordModal();break;case 'import-dialog':importDialog();break;case 'export-csv':exportCSV();break;case 'export-json':exportJSON();break;case 'share-backup':shareBackup();break;case 'import-json':document.getElementById('jsonFile')?.click();break;case 'reset-progress':resetProgress();break;}});
 document.getElementById('csvFile').addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{document.getElementById('importText').value=await f.text();toast('文件已读取，点击导入即可')}catch(err){toast('读取文件失败')}finally{e.target.value=''}});
 document.getElementById('wordForm').addEventListener('submit',e=>{e.preventDefault();const en=document.getElementById('formEn').value.trim(),cn=document.getElementById('formCn').value.trim(),example=document.getElementById('formExample').value.trim();if(!en||!cn)return;const duplicate=db.words.find(w=>w.en.toLowerCase()===en.toLowerCase()&&w.id!==editId);if(duplicate)return toast('该单词已存在');const w=editId?db.words.find(w=>w.id===editId):null;if(w)Object.assign(w,{en,cn,example});else db.words.push(makeWord(en,cn,example));document.getElementById('wordModal').close();save();render();toast('单词已保存')});
