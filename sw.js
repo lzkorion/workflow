@@ -1,4 +1,4 @@
-const CACHE='wordflow-fsrs6-20261015-v1';
+const CACHE='wordflow-fsrs6-bulk-20261016-v2';
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('wordflow-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
