@@ -400,7 +400,54 @@ document.getElementById('content').addEventListener('input',e=>{if(e.target.id==
 document.getElementById('content').addEventListener('change',e=>{if(e.target.matches('[data-bulk-id]')){const id=e.target.dataset.bulkId;if(e.target.checked)selectedWordIds.add(id);else selectedWordIds.delete(id);const n=selectedWordIds.size;const counter=document.querySelector('.bulk-count'),del=document.querySelector('[data-action="bulk-delete"]'),clear=document.querySelector('[data-action="bulk-clear"]');if(counter)counter.textContent='已选择 '+n+' 个单词';if(del){del.disabled=!n;del.textContent='删除已选 '+n+' 词'}if(clear)clear.disabled=!n;return}if(e.target.id==='targetSelect'){db.target=Number(e.target.value)||30;save();render()}if(e.target.id==='typeAnswer'){db.typeAnswer=e.target.checked;revealed=false;typedCorrect=null;save();render()}if(e.target.id==='jsonFile'){const f=e.target.files?.[0];if(!f)return;f.text().then(t=>{const d=JSON.parse(t);if(!d||!Array.isArray(d.words)||!d.words.every(w=>typeof w.en==='string'&&typeof w.cn==='string'))throw Error('备份格式不正确');if(!confirm(`确认用备份替换当前全部 ${db.words.length} 个词及学习历史吗？`))return;db={...initial(),...d};selectedWordIds.clear();bulkMode=false;db.words=db.words.map(w=>({...makeWord(String(w.en),String(w.cn),String(w.example||'')),...w}));current=null;session=[];phaseOrder=[];phaseGrades={};phaseDone=0;sessionDone=0;sessionTotal=0;restoreSession();save();render();toast('备份已恢复')}).catch(err=>toast('导入失败：'+err.message)).finally(()=>{e.target.value=''})}});
 document.getElementById('content').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('tap-ready')){e.preventDefault();revealed=true;save();render()}});
 document.addEventListener('keydown',e=>{if(e.target.closest('dialog')||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)){if(e.key==='Enter'&&e.target.id==='spellInput'){e.preventDefault();checkSpell()}return}if(view==='practice'&&current){if(e.code==='Space'&&!revealed&&!(db.typeAnswer&&cycleStage===1)){e.preventDefault();revealed=true;save();render()}else if(revealed&&['1','2','3','4'].includes(e.key)){rateWord(Number(e.key)-1)}}});
+
+// One-time migration for the user's supplied book glossary. The file is static,
+// but data, ratings and FSRS state live only in the current browser's localStorage.
+let bookImportPending=false;
+async function importBookAfterUpload(){
+ const importId='cet4-book-skip300-20261017-v1';
+ if(bookImportPending||db.appliedBookImports?.[importId])return;
+ bookImportPending=true;
+ try{
+  const response=await fetch('./wordflow-cet4-import-20261017.json',{cache:'no-store'});
+  if(!response.ok)throw Error('词表文件暂未可用：'+response.status);
+  const payload=await response.json();
+  if(payload.id!==importId||payload.skippedLines!==300||payload.remainingLines!==4005||payload.uniqueWords!==3968||!Array.isArray(payload.entries)||payload.entries.length!==3968||!Array.isArray(payload.removeWords)||payload.removeWords.length!==297)throw Error('词表校验未通过');
+  const filteredSet=new Set(payload.entries.map(x=>String(x.en||'').trim().toLowerCase()));
+  if(filteredSet.size!==3968||payload.entries.some(x=>typeof x.cn!=='string'||!x.cn.trim()))throw Error('词条格式不正确');
+  const removedSet=new Set(payload.removeWords);
+  const before=db.words.length;
+  // Never wipe arbitrary existing words: only delete the first-300 words that
+  // do not reappear later in the original book, preserve all other user data.
+  const untouchedDefaults=db.words.length===DATA.length && db.words.every((w,i)=>
+   w.en.trim().toLowerCase()===DATA[i][0].toLowerCase() && !w.seen && w.cn===DATA[i][1]);
+  const currentWords=untouchedDefaults?[]:db.words.filter(w=>!removedSet.has(w.en.trim().toLowerCase()));
+  const existing=new Map(currentWords.map(w=>[w.en.trim().toLowerCase(),w]));
+  const ordered=[],inUse=new Set();let added=0,updated=0;
+  for(const entry of payload.entries){
+   const en=entry.en.trim(),key=en.toLowerCase();
+   let w=existing.get(key);
+   if(w){w.cn=entry.cn;w.en=en;updated++} // preserve FSRS scores/due/seen
+   else {w=makeWord(en,entry.cn,'');added++}
+   ordered.push(w);inUse.add(key);
+  }
+  const extras=currentWords.filter(w=>!inUse.has(w.en.trim().toLowerCase()));
+  db.words=[...ordered,...extras];
+  // If an active cycle includes deleted words, remove them from the queue.
+  const validIds=new Set(db.words.map(w=>w.id));
+  const affected=(current&&!validIds.has(current.id))||session.some(id=>!validIds.has(id))||phaseOrder.some(id=>!validIds.has(id));
+  if(affected){session=[];current=null;phaseOrder=[];phaseGrades={};phaseDone=0;sessionDone=0;sessionTotal=0;cycleStage=0;revealed=false;typedCorrect=null}
+  selectedWordIds=new Set([...selectedWordIds].filter(id=>validIds.has(id)));
+  db.appliedBookImports={...(db.appliedBookImports||{}),[importId]:{at:Date.now(),added,updated,removed:before-currentWords.length}};
+  if(!save())throw Error('本地存储失败，请确认浏览器储存空间');
+  render();
+  toast('已导入完整释义：新增 '+added+' 词，补全 '+updated+' 词；已排除词表前 300 条');
+ }catch(e){console.warn('Wordflow book import postponed:',e);}
+ finally{bookImportPending=false}
+}
+window.addEventListener('online',importBookAfterUpload);
 render();
+importBookAfterUpload();
 if('serviceWorker' in navigator && typeof location!=='undefined' && location.protocol==='https:'){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}
 </script>
 </body></html>
